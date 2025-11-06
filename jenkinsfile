@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        SSH_CRED = 'node-app-key'        // Jenkins credential ID
-        SERVER_IP = '172.31.11.37'       // EC2 IP
+        SSH_CRED = 'node-app-key'
+        SERVER_IP = '3.110.25.70'  // Use public IP for external Jenkins
         REMOTE_USER = 'ubuntu'
         WEB_DIR = '/var/www/html'
     }
@@ -20,7 +20,7 @@ pipeline {
                 sshagent(credentials: ["${SSH_CRED}"]) {
                     sh '''
                         echo "Setting up Apache on remote server..."
-                        ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${SERVER_IP} "
+                        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${REMOTE_USER}@${SERVER_IP} "
                             sudo apt update -y &&
                             sudo apt install apache2 -y &&
                             sudo mkdir -p ${WEB_DIR} &&
@@ -39,17 +39,25 @@ pipeline {
                 sshagent(credentials: ["${SSH_CRED}"]) {
                     sh '''
                         echo "Cleaning old files on server..."
-                        ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${SERVER_IP} "sudo rm -rf ${WEB_DIR}/*"
+                        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${REMOTE_USER}@${SERVER_IP} "sudo rm -rf ${WEB_DIR}/*"
 
                         echo "Uploading new files to /tmp on server..."
-                        scp -r index.html css js fonts images ${REMOTE_USER}@${SERVER_IP}:/tmp/
+                        scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -r index.html css js fonts images ${REMOTE_USER}@${SERVER_IP}:/tmp/
 
                         echo "Deploying files to Apache directory..."
-                        ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${SERVER_IP} "
-                            sudo cp -r /tmp/index.html /tmp/css /tmp/js /tmp/fonts /tmp/images ${WEB_DIR}/
+                        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${REMOTE_USER}@${SERVER_IP} "
+                            sudo cp -r /tmp/index.html /tmp/css /tmp/js /tmp/fonts /tmp/images ${WEB_DIR}/ &&
+                            sudo systemctl restart apache2
                         "
                     '''
                 }
+            }
+        }
+
+        stage('Show Deployment URL') {
+            steps {
+                echo "✅ Deployment complete!"
+                echo "🌐 Visit your portfolio at: http://${SERVER_IP}/"
             }
         }
     }
